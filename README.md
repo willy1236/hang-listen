@@ -40,3 +40,7 @@ YouTube 可輸入 `@handle`、頻道網址（`/@handle`、`/channel/UC…`）或
 - 會聽到 Twitch 插入的廣告。
 - 小米、三星等廠牌除了電池最佳化還有各自的背景限制（自啟動、鎖定最近任務），需要手動放行。
 - 要支援其他平台，在 `StreamSource` 加一個實作並在 `parse()` 接上即可。
+
+## 授權
+
+[GPL-3.0-or-later](LICENSE)。使用的 NewPipeExtractor 是 GPLv3，因此本專案也以 GPLv3 釋出。
