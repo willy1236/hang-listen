@@ -11,6 +11,8 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        // NewPipeExtractor 與它依賴的 nanojson 只發布在 JitPack
+        maven("https://jitpack.io")
     }
 }
 

@@ -25,6 +25,8 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+        // NewPipeExtractor 用到 minSdk 33 以下沒有的 java.nio API
+        isCoreLibraryDesugaringEnabled = true
     }
 
     kotlinOptions {
@@ -51,4 +53,7 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-hls:$media3")
 
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+
+    implementation("com.github.teamnewpipe:NewPipeExtractor:v0.26.5")
+    coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.4")
 }

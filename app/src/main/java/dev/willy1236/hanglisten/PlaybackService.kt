@@ -39,7 +39,7 @@ import kotlinx.coroutines.launch
  *
  * - 每個播放器都關掉自己的音訊焦點處理（不然會互相搶焦點、互相暫停），
  *   改由服務統一向系統要一次焦點，失去焦點時一起暫停。
- * - 只播 audio_only 串流，不解碼影像，省電省流量。
+ * - 只播音訊串流，不解碼影像，省電省流量。
  * - 斷線、token 過期、未開台都會自動重新解析並重試。
  */
 class PlaybackService : Service() {
@@ -55,13 +55,15 @@ class PlaybackService : Service() {
 
     data class StreamState(
         val id: Long,
+        /** [StreamSource.key] */
         val channel: String,
+        val label: String,
         val status: Status,
         val volume: Float,
         val message: String?,
     )
 
-    private class Entry(val id: Long, val channel: String, val player: ExoPlayer) {
+    private class Entry(val id: Long, val source: StreamSource, val player: ExoPlayer) {
         var status = Status.RESOLVING
         var message: String? = null
         var volume = 1f
@@ -128,13 +130,13 @@ class PlaybackService : Service() {
 
     /** 成功回傳 null，失敗回傳錯誤訊息。 */
     fun addChannel(input: String, volume: Float = 1f): String? {
-        val channel = TwitchResolver.normalizeChannel(input) ?: return "頻道 ID 格式不對"
-        if (entries.values.any { it.channel == channel }) return "$channel 已經在清單裡了"
+        val source = StreamSource.parse(input) ?: return "看不出是哪個 Twitch 或 YouTube 頻道"
+        if (entries.values.any { it.source == source }) return "${source.label} 已經在清單裡了"
 
         ensureForeground()
         if (!_pausedByUser.value) requestFocus()
 
-        val entry = Entry(nextId++, channel, buildPlayer())
+        val entry = Entry(nextId++, source, buildPlayer())
         entry.volume = volume
         entry.player.addListener(listenerFor(entry))
         entries[entry.id] = entry
@@ -214,7 +216,7 @@ class PlaybackService : Service() {
         .setWakeMode(C.WAKE_MODE_NETWORK)
         .build()
         .apply {
-            // Twitch 插播廣告時，audio_only 清單裡也會夾帶 1080p 影像片段；
+            // Twitch 插播廣告時，audio_only 清單裡也會夾帶 1080p 影像片段；YouTube 沒有分開的音訊時只能播影音混合串流。
             // 不關掉影像軌的話每台都會開一個硬體影像解碼器，多台時互搶而卡在緩衝
             trackSelectionParameters = trackSelectionParameters.buildUpon()
                 .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true)
@@ -226,7 +228,7 @@ class PlaybackService : Service() {
         setStatus(entry, Status.RESOLVING)
         entry.job = scope.launch {
             try {
-                val url = TwitchResolver.resolveAudioUrl(entry.channel)
+                val url = entry.source.resolveAudioUrl()
                 if (!entries.containsKey(entry.id)) return@launch
                 entry.player.setMediaItem(
                     MediaItem.Builder()
@@ -239,7 +241,7 @@ class PlaybackService : Service() {
                 entry.player.prepare()
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: TwitchResolver.OfflineException) {
+            } catch (e: OfflineException) {
                 setStatus(entry, Status.OFFLINE)
                 retryLater(entry, OFFLINE_POLL_MS)
             } catch (e: Exception) {
@@ -310,14 +312,14 @@ class PlaybackService : Service() {
 
     private fun publish(updateNotification: Boolean = true) {
         _streams.value = entries.values.map {
-            StreamState(it.id, it.channel, it.status, it.volume, it.message)
+            StreamState(it.id, it.source.key, it.source.label, it.status, it.volume, it.message)
         }
         if (updateNotification) updateNotification()
         saveSession()
     }
 
     private fun saveSession() {
-        val session = entries.values.joinToString("\n") { "${it.channel}\t${it.volume}" }
+        val session = entries.values.joinToString("\n") { "${it.source.key}\t${it.volume}" }
         if (session == savedSession) return
         savedSession = session
         prefs().edit().putString(KEY_SESSION, session).apply()
@@ -425,7 +427,7 @@ class PlaybackService : Service() {
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle("掛台中：$playing / ${entries.size} 台播放中")
-            .setContentText(entries.values.joinToString("、") { it.channel })
+            .setContentText(entries.values.joinToString("、") { it.source.label })
             .setContentIntent(openApp)
             .setOngoing(true)
             .setOnlyAlertOnce(true)

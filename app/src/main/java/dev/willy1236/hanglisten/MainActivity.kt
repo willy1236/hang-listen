@@ -194,7 +194,7 @@ private fun MainScreen(
                         input = it
                         error = null
                     },
-                    label = { Text("Twitch 頻道 ID 或網址") },
+                    label = { Text("Twitch／YouTube 頻道或網址") },
                     singleLine = true,
                     isError = error != null,
                     modifier = Modifier.weight(1f),
@@ -204,7 +204,7 @@ private fun MainScreen(
                     onClick = {
                         val result = service?.addChannel(input)
                         if (result == null) {
-                            TwitchResolver.normalizeChannel(input)?.let(history::record)
+                            StreamSource.parse(input)?.key?.let(history::record)
                             input = ""
                         } else {
                             error = result
@@ -286,14 +286,15 @@ private fun RecentChannels(
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             channels.forEach { channel ->
+                val label = StreamSource.parse(channel)?.label ?: channel
                 InputChip(
                     selected = false,
                     onClick = { onAdd(channel) },
                     enabled = enabled,
-                    label = { Text(channel) },
+                    label = { Text(label) },
                     trailingIcon = {
                         IconButton(onClick = { onForget(channel) }, modifier = Modifier.size(18.dp)) {
-                            Icon(Icons.Filled.Close, contentDescription = "從紀錄刪除 $channel")
+                            Icon(Icons.Filled.Close, contentDescription = "從紀錄刪除 $label")
                         }
                     },
                 )
@@ -312,7 +313,7 @@ private fun StreamCard(
         Column(modifier = Modifier.padding(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(stream.channel, style = MaterialTheme.typography.titleMedium)
+                    Text(stream.label, style = MaterialTheme.typography.titleMedium)
                     val detail = stream.message?.let { "（$it）" }.orEmpty()
                     Text(
                         stream.status.label + detail,

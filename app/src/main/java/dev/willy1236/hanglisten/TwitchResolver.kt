@@ -21,8 +21,6 @@ import kotlin.random.Random
  */
 object TwitchResolver {
 
-    class OfflineException(channel: String) : IOException("$channel 目前沒有開台")
-
     private const val GQL_URL = "https://gql.twitch.tv/gql"
 
     // Twitch 網頁版公開使用的 Client-ID（streamlink 等工具也用這個）
@@ -73,7 +71,7 @@ object TwitchResolver {
             .toString()
 
         val (code, body) = request(usherUrl)
-        if (code == 404) throw OfflineException(channel)
+        if (code == 404) throw OfflineException("$channel 目前沒有開台")
         if (code !in 200..299) throw IOException("usher HTTP $code")
         pickAudioOnly(body, usherUrl)
     }
